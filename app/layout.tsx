@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
-  title: "최서연 | 프로필",
-  description: "안녕하세요! 바이브코딩을 배우고 있는 대학생 최서연입니다.",
+  title: "최서연 | Notion Profile & Portfolio",
+  description: "Notion 스타일의 정갈하고 따뜻한 프로필 페이지",
 };
 
 export default function RootLayout({
@@ -23,11 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="ko" className={cn("h-full", "antialiased", inter.variable, "font-sans", geist.variable)}>
+      <body className="min-h-full flex flex-col bg-[#f6f5f4] text-[#000000]">{children}</body>
     </html>
   );
 }
