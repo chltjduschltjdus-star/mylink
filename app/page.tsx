@@ -7,6 +7,8 @@ import { LinkCard } from "@/components/link-card";
 import { SectionHeader } from "@/components/section-header";
 import { PageHeader } from "@/components/page-header";
 import { PageFooter } from "@/components/page-footer";
+import { AddLinkDialog, type NewLinkData } from "@/components/add-link-dialog";
+import { Plus } from "lucide-react";
 import {
   MOCK_USER,
   MOCK_SOCIALS,
@@ -23,6 +25,7 @@ export default function HomePage() {
   const [blocks, setBlocks] = useState<Block[]>(MOCK_BLOCKS);
   const [isCopied, setIsCopied] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   // 1. 더미 데이터 로드 (LocalStorage 조회 또는 기본 Mock 주입)
   useEffect(() => {
@@ -47,6 +50,38 @@ export default function HomePage() {
       setIsLoaded(true);
     }
   }, []);
+
+  // 새 링크 추가 핸들러 (로컬 상태 반영 및 LocalStorage 동기화)
+  const handleAddLink = (data: NewLinkData) => {
+    const maxOrder = blocks.length > 0 ? Math.max(...blocks.map((b) => b.order)) : 0;
+    const newBlock: Block = {
+      id: `block_link_${Date.now()}`,
+      userId: user.id || "user_seoyeon_01",
+      type: "link",
+      title: data.title,
+      url: data.url,
+      icon: data.icon || "globe",
+      isActive: true,
+      order: maxOrder + 1,
+      clickCount: 0,
+    };
+
+    const updatedBlocks = [...blocks, newBlock];
+    setBlocks(updatedBlocks);
+
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          user,
+          socials,
+          blocks: updatedBlocks,
+        })
+      );
+    } catch (e) {
+      console.error("새 링크 저장 실패:", e);
+    }
+  };
 
   // 링크 클릭 핸들러 (실시간 누적 클릭 카운트 & 새 창 URL 이동)
   const handleLinkClick = (block: Block) => {
@@ -150,11 +185,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-[#fef5f0] via-[#fdf8f5] to-[#f7f2fa] text-slate-800 flex flex-col items-center py-8 sm:py-14 px-4 font-sans selection:bg-pink-100 selection:text-pink-900">
-      {/* 1. 상단 컨트롤 바 (MyLink 뱃지, 데이터 초기화, 프로필 공유) */}
+      {/* 1. 상단 컨트롤 바 (MyLink 뱃지, 링크 추가, 데이터 초기화, 프로필 공유) */}
       <PageHeader
         isCopied={isCopied}
         onShare={handleShareProfile}
         onReset={handleResetData}
+        onOpenAddLink={() => setIsAddDialogOpen(true)}
       />
 
       {/* 2. 메인 프로필 및 링크 콘텐츠 컨테이너 */}
@@ -189,11 +225,30 @@ export default function HomePage() {
               />
             );
           })}
+
+          {/* 목록 하단 빠른 링크 추가 카드 */}
+          <button
+            type="button"
+            onClick={() => setIsAddDialogOpen(true)}
+            className="w-full mt-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl border-2 border-dashed border-pink-200/90 bg-white/40 hover:bg-white/80 hover:border-pink-300 text-pink-600 hover:text-pink-700 font-medium text-sm transition-all duration-200 group active:scale-[0.99] cursor-pointer shadow-2xs"
+          >
+            <div className="size-6 rounded-full bg-pink-100 flex items-center justify-center group-hover:bg-pink-200 transition-colors">
+              <Plus className="size-3.5 text-pink-600" />
+            </div>
+            <span>새 링크 추가하기</span>
+          </button>
         </div>
 
         {/* 4. 브랜딩 푸터 */}
         <PageFooter />
       </main>
+
+      {/* 5. 링크 추가 다이얼로그 모달 */}
+      <AddLinkDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onAddLink={handleAddLink}
+      />
     </div>
   );
 }

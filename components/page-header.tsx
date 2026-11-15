@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Sparkles, RotateCcw, Share2, Check } from "lucide-react";
+import { Sparkles, RotateCcw, Share2, Check, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -7,6 +7,7 @@ interface PageHeaderProps {
   isCopied: boolean;
   onShare: () => void;
   onReset: () => void;
+  onOpenAddLink?: () => void;
   className?: string;
 }
 
@@ -14,6 +15,7 @@ export function PageHeader({
   isCopied,
   onShare,
   onReset,
+  onOpenAddLink,
   className = "",
 }: PageHeaderProps) {
   return (
@@ -27,8 +29,20 @@ export function PageHeader({
         <span>MyLink Demo</span>
       </Badge>
 
-      {/* 액션 버튼 그룹 (초기화 + 공유) */}
-      <div className="flex items-center gap-2">
+      {/* 액션 버튼 그룹 (링크 추가 + 초기화 + 공유) */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {onOpenAddLink && (
+          <Button
+            size="sm"
+            onClick={onOpenAddLink}
+            title="새 링크 추가하기"
+            className="text-xs bg-pink-500 hover:bg-pink-600 text-white rounded-full h-8 px-3 gap-1 shadow-xs transition-all active:scale-95"
+          >
+            <Plus className="size-3.5" />
+            <span>링크 추가</span>
+          </Button>
+        )}
+
         <Button
           variant="ghost"
           size="sm"
@@ -37,7 +51,7 @@ export function PageHeader({
           className="text-xs text-slate-500 hover:text-slate-800 hover:bg-white/80 rounded-full h-8 px-2.5 gap-1.5 transition-all shadow-xs"
         >
           <RotateCcw className="size-3.5" />
-          <span className="hidden sm:inline">데이터 초기화</span>
+          <span className="hidden sm:inline">초기화</span>
         </Button>
 
         <Button
@@ -54,7 +68,7 @@ export function PageHeader({
           ) : (
             <>
               <Share2 className="size-3.5 text-slate-600" />
-              <span>공유</span>
+              <span className="hidden xs:inline">공유</span>
             </>
           )}
         </Button>
