@@ -35,7 +35,25 @@ export default function HomePage() {
         const parsed = JSON.parse(savedData);
         if (parsed.user) setUser(parsed.user);
         if (Array.isArray(parsed.socials)) setSocials(parsed.socials);
-        if (Array.isArray(parsed.blocks)) setBlocks(parsed.blocks);
+        if (Array.isArray(parsed.blocks)) {
+          // 사용자가 직접 추가한 커스텀 링크(id가 "block_link_"로 시작) 추출 및 보존
+          const customAddedBlocks = parsed.blocks.filter(
+            (b: Block) => b.id && b.id.startsWith("block_link_")
+          );
+
+          // 5개의 기본 MOCK_BLOCKS와 사용자가 추가한 링크를 병합
+          const mergedBlocks = [...MOCK_BLOCKS, ...customAddedBlocks];
+          setBlocks(mergedBlocks);
+
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              user: parsed.user || MOCK_USER,
+              socials: parsed.socials || MOCK_SOCIALS,
+              blocks: mergedBlocks,
+            })
+          );
+        }
       } else {
         const initialData = {
           user: MOCK_USER,
@@ -195,7 +213,7 @@ export default function HomePage() {
 
       {/* 2. 메인 프로필 및 링크 콘텐츠 컨테이너 */}
       <main className="w-full max-w-[480px] flex flex-col items-center">
-        {/* 프로필 헤더 (아바타, 이름, 핸들, 바이오) */}
+        {/* 프로필 헤더 (파스텔톤 그라데이션 아바타, 이름, 핸들, 바이오) */}
         <ProfileHeader user={user} />
 
         {/* 원형 소셜 아이콘 바 */}

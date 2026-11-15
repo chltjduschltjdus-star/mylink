@@ -107,7 +107,7 @@
       "id": "block_hdr_2",
       "userId": "user_seoyeon_01",
       "type": "header",
-      "title": "✍️ 기술 블로그 & 최신 아티클",
+      "title": "✍️ 아티클 & 소통",
       "isActive": true,
       "order": 5,
       "clickCount": 0
@@ -127,42 +127,11 @@
       "id": "block_lnk_5",
       "userId": "user_seoyeon_01",
       "type": "link",
-      "title": "디자인 시스템 설계와 컴포넌트 추상화 전략",
-      "url": "https://brunch.co.kr/@seoyeon/uiux-notes",
-      "icon": "pen-tool",
-      "isActive": true,
-      "order": 7,
-      "clickCount": 231
-    },
-    {
-      "id": "block_hdr_3",
-      "userId": "user_seoyeon_01",
-      "type": "header",
-      "title": "💬 소통 & 협업 문의",
-      "isActive": true,
-      "order": 8,
-      "clickCount": 0
-    },
-    {
-      "id": "block_lnk_6",
-      "userId": "user_seoyeon_01",
-      "type": "link",
-      "title": "☕ 커피 한 잔 후원하기 (Buy Me a Coffee)",
-      "url": "https://buymeacoffee.com/seoyeon_dev",
-      "icon": "coffee",
-      "isActive": true,
-      "order": 9,
-      "clickCount": 45
-    },
-    {
-      "id": "block_lnk_7",
-      "userId": "user_seoyeon_01",
-      "type": "link",
       "title": "카카오톡 1:1 오픈채팅 (프로젝트 & 협업 문의)",
       "url": "https://open.kakao.com/me/seoyeon_dev",
       "icon": "message-circle",
       "isActive": true,
-      "order": 10,
+      "order": 7,
       "clickCount": 78
     }
   ],

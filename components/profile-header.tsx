@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { User } from "@/lib/mockData";
+import { Sparkles } from "lucide-react";
 
 interface ProfileHeaderProps {
   user: User;
@@ -8,23 +8,25 @@ interface ProfileHeaderProps {
 }
 
 export function ProfileHeader({ user, className = "" }: ProfileHeaderProps) {
-  const initials = user.displayName ? user.displayName.slice(0, 2) : "ML";
+  // 표시 이름의 앞 글자 (예: "최" 또는 "서연")
+  const initial = user.displayName ? user.displayName.slice(0, 1) : "M";
 
   return (
     <section className={`flex flex-col items-center text-center w-full ${className}`}>
-      {/* 파스텔 글로우 링 + shadcn Avatar */}
+      {/* 파스텔톤 그라데이션 아바타 (인물 사진 대신 은은하고 감성적인 파스텔 그라데이션) */}
       <div className="relative group mb-3.5">
-        <div className="absolute -inset-1.5 bg-gradient-to-tr from-pink-300 via-rose-200 to-amber-200 rounded-full blur-xs opacity-75 group-hover:opacity-100 transition-opacity" />
-        <Avatar className="size-24 border-4 border-white shadow-md relative">
-          <AvatarImage
-            src={user.avatarUrl}
-            alt={user.displayName}
-            className="object-cover"
-          />
-          <AvatarFallback className="bg-pink-100 text-pink-700 text-lg font-bold">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        {/* 외부 소프트 글로우 링 */}
+        <div className="absolute -inset-1.5 bg-gradient-to-tr from-pink-300 via-rose-200 to-amber-200 rounded-full blur-xs opacity-70 group-hover:opacity-90 transition-opacity" />
+        
+        {/* 메인 파스텔 그라데이션 원형 */}
+        <div className="relative size-24 rounded-full border-4 border-white shadow-md bg-gradient-to-tr from-rose-300 via-pink-200 to-amber-100 flex items-center justify-center overflow-hidden">
+          {/* 부드러운 내부 빛 반사 효과 및 중앙 이니셜 */}
+          <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px]" />
+          <span className="relative text-2xl font-black text-rose-500/80 tracking-wider select-none drop-shadow-xs">
+            {initial}
+          </span>
+          <Sparkles className="absolute top-3 right-3 size-3.5 text-amber-300/80 animate-pulse" />
+        </div>
       </div>
 
       {/* 표시 이름 & 사용자 핸들 */}
