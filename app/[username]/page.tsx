@@ -10,3 +10,9 @@ export default async function DynamicProfilePage({ params }: PageProps) {
 
   return <DisplayNameClientPage initialDisplayName={username} />;
 }
+
+export function generateStaticParams() {
+  return [
+    { displayName: "최서연" },
+  ];
+}
