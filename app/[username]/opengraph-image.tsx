@@ -4,6 +4,8 @@ import { getLinksFromFirestore } from '@/lib/links';
 import { MOCK_USER, MOCK_BLOCKS } from '@/lib/mockData';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-static';
+
 
 // 이미지 메타데이터
 export const alt = '마이링크 프로필 OG 이미지';
