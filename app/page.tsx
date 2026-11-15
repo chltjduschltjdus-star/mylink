@@ -133,7 +133,7 @@ export default function HomePage() {
         <div className="flex flex-col items-center gap-3">
           <div className="size-10 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
           <p className="text-sm font-medium text-slate-500">
-            Firestore에서 링크를 불러오는 중...
+            로딩 중...
           </p>
         </div>
       </div>
