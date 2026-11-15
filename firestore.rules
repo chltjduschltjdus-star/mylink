@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. 사용자 컬렉션 (users/{userId} 및 user/{userId} 모두 지원)
+    match /{userCollection}/{userId} {
+      allow read: if userCollection in ['users', 'user'];
+      allow create, update, delete: if userCollection in ['users', 'user'] && request.auth != null && request.auth.uid == userId;
+
+      // 2. 사용자의 프로필 서브컬렉션
+      match /profile/{profileId} {
+        allow read: if userCollection in ['users', 'user'];
+        allow create, update, delete: if userCollection in ['users', 'user'] && request.auth != null && request.auth.uid == userId;
+      }
+
+      // 3. 사용자의 링크 서브컬렉션 (user/{userId}/links 및 users/{userId}/links)
+      match /links/{linkId} {
+        // [조회]: 누구나 공개 (누구나 링크 목록을 볼 수 있음)
+        allow read: if userCollection in ['users', 'user'];
+
+        // [추가 및 삭제]: 로그인한 본인만 가능
+        allow create, delete: if userCollection in ['users', 'user'] && request.auth != null && request.auth.uid == userId;
+
+        // [수정]: 로그인한 본인은 제목, URL 등 모든 필드 수정 가능
+        // (단, 방문자의 링크 클릭 수 카운트 증가는 clickCount 단일 필드 +1에 한해 허용)
+        allow update: if userCollection in ['users', 'user'] && (
+          (request.auth != null && request.auth.uid == userId)
+          || (
+            // 방문자 링크 클릭 시 clickCount 단일 필드만 1 증가 허용
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clickCount'])
+            && request.resource.data.clickCount == resource.data.clickCount + 1
+          )
+        );
+      }
+    }
+
+    // 기본적으로 기타 경로는 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

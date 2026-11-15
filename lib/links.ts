@@ -4,18 +4,26 @@ import {
   getDocs,
   onSnapshot,
   doc,
+  setDoc,
   updateDoc,
   deleteDoc,
   serverTimestamp,
   query,
   orderBy,
-  FieldValue,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import { Block, TimestampLike } from "./mockData";
 
-// Firestore 저장 경로: users/anonymous/links
-export const FIRESTORE_LINKS_PATH = "users/anonymous/links";
+/**
+ * Firestore 경로 헬퍼 함수
+ * @param userId 사용자 uid (요구사항: user/{userId}/links)
+ */
+export function getUserLinksCollectionRef(userId: string) {
+  const safeUid = userId || "anonymous";
+  return collection(db, "user", safeUid, "links");
+}
 
 export interface CreateLinkInput {
   title: string;
@@ -68,14 +76,41 @@ export function sortLinksByCreatedAtDesc(items: Block[]): Block[] {
   });
 }
 
+function mapDocToBlock(d: QueryDocumentSnapshot<DocumentData>, safeUid: string): Block {
+  const data = d.data() as Partial<FirestoreLinkDocument>;
+  return {
+    id: d.id,
+    userId: data.userId || safeUid,
+    type: "link",
+    title: data.title || "",
+    url: data.url || "",
+    icon: data.icon || "globe",
+    isActive: data.isActive !== undefined ? data.isActive : true,
+    order: typeof data.order === "number" ? data.order : 0,
+    clickCount: typeof data.clickCount === "number" ? data.clickCount : 0,
+    createdAt: data.createdAt,
+  };
+}
+
 /**
- * 1. Firestore `users/anonymous/links` 경로에 새 링크 문서 추가
+ * 1. Firestore `user/{userId}/links` 경로에 새 링크 문서 추가
+ * (기존 데이터 호환을 위해 `users/{userId}/links`에도 병행 저장)
  */
-export async function addLinkToFirestore(input: CreateLinkInput): Promise<Block> {
-  const linksRef = collection(db, "users", "anonymous", "links");
+export async function addLinkToFirestore(
+  userId: string,
+  input: CreateLinkInput
+): Promise<Block> {
+  // [보안 검증] 로그인한 본인만 링크 추가 가능
+  if (!auth.currentUser || auth.currentUser.uid !== userId) {
+    throw new Error("링크 추가 권한이 없습니다. 본인 계정으로 로그인해주세요.");
+  }
+
+  const safeUid = userId || "anonymous";
+  const userLinksRef = collection(db, "user", safeUid, "links");
+  const usersLinksRef = collection(db, "users", safeUid, "links");
 
   const newDocData: Omit<FirestoreLinkDocument, "id"> = {
-    userId: "anonymous",
+    userId: safeUid,
     type: "link",
     title: input.title.trim(),
     url: input.url.trim(),
@@ -86,11 +121,19 @@ export async function addLinkToFirestore(input: CreateLinkInput): Promise<Block>
     createdAt: serverTimestamp(),
   };
 
-  const docRef = await addDoc(linksRef, newDocData);
+  // 1) user/{userId}/links에 추가
+  const docRef = await addDoc(userLinksRef, newDocData);
+
+  // 2) users/{userId}/links에도 동기화 저장
+  try {
+    await setDoc(doc(usersLinksRef, docRef.id), newDocData);
+  } catch (syncErr) {
+    console.warn("users/{userId}/links 동기화 저장 알림:", syncErr);
+  }
 
   return {
     id: docRef.id,
-    userId: "anonymous",
+    userId: safeUid,
     type: "link",
     title: newDocData.title,
     url: newDocData.url,
@@ -103,134 +146,126 @@ export async function addLinkToFirestore(input: CreateLinkInput): Promise<Block>
 }
 
 /**
- * 2. Firestore `users/anonymous/links` 경로의 링크 조회 (createdAt 최신순)
+ * 2. Firestore `user/{userId}/links` (및 users/{userId}/links) 링크 목록 1회 조회 (createdAt 최신순)
  */
-export async function getLinksFromFirestore(): Promise<Block[]> {
+export async function getLinksFromFirestore(userId: string): Promise<Block[]> {
+  const safeUid = userId || "anonymous";
+  const userLinksRef = collection(db, "user", safeUid, "links");
+  const usersLinksRef = collection(db, "users", safeUid, "links");
+
   try {
-    const linksRef = collection(db, "users", "anonymous", "links");
-    const q = query(linksRef, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
+    // 1) user/{userId}/links 우선 조회
+    const q1 = query(userLinksRef, orderBy("createdAt", "desc"));
+    const snapshot1 = await getDocs(q1);
+    if (!snapshot1.empty) {
+      const items = snapshot1.docs.map((d) => mapDocToBlock(d, safeUid));
+      return sortLinksByCreatedAtDesc(items);
+    }
 
-    const items: Block[] = snapshot.docs.map((d) => {
-      const data = d.data() as Partial<FirestoreLinkDocument>;
-      return {
-        id: d.id,
-        userId: data.userId || "anonymous",
-        type: "link",
-        title: data.title || "",
-        url: data.url || "",
-        icon: data.icon || "globe",
-        isActive: data.isActive !== undefined ? data.isActive : true,
-        order: typeof data.order === "number" ? data.order : 0,
-        clickCount: typeof data.clickCount === "number" ? data.clickCount : 0,
-        createdAt: data.createdAt,
-      };
-    });
+    // 2) users/{userId}/links 조회
+    const q2 = query(usersLinksRef, orderBy("createdAt", "desc"));
+    const snapshot2 = await getDocs(q2);
+    if (!snapshot2.empty) {
+      const items = snapshot2.docs.map((d) => mapDocToBlock(d, safeUid));
+      return sortLinksByCreatedAtDesc(items);
+    }
 
+    // 3) 폴백: orderBy 없이 조회
+    const fallbackSnap1 = await getDocs(userLinksRef);
+    if (!fallbackSnap1.empty) {
+      const items = fallbackSnap1.docs.map((d) => mapDocToBlock(d, safeUid));
+      return sortLinksByCreatedAtDesc(items);
+    }
+
+    const fallbackSnap2 = await getDocs(usersLinksRef);
+    const items = fallbackSnap2.docs.map((d) => mapDocToBlock(d, safeUid));
     return sortLinksByCreatedAtDesc(items);
   } catch (error) {
-    console.error("Firestore 링크 조회(orderBy) 실패, 기본 조회 폴백 시도:", error);
-    try {
-      const linksRef = collection(db, "users", "anonymous", "links");
-      const snapshot = await getDocs(linksRef);
-      const items: Block[] = snapshot.docs.map((d) => {
-        const data = d.data() as Partial<FirestoreLinkDocument>;
-        return {
-          id: d.id,
-          userId: data.userId || "anonymous",
-          type: "link",
-          title: data.title || "",
-          url: data.url || "",
-          icon: data.icon || "globe",
-          isActive: data.isActive !== undefined ? data.isActive : true,
-          order: typeof data.order === "number" ? data.order : 0,
-          clickCount: typeof data.clickCount === "number" ? data.clickCount : 0,
-          createdAt: data.createdAt,
-        };
-      });
-      return sortLinksByCreatedAtDesc(items);
-    } catch (fallbackError) {
-      console.error("Firestore 링크 폴백 조회 실패:", fallbackError);
-      return [];
-    }
+    console.warn("Firestore 링크 조회 오류, 빈 배열 반환:", error);
+    return [];
   }
 }
 
 /**
- * 3. Firestore `users/anonymous/links` 실시간 동기화 구독 (createdAt 최신순 정렬)
+ * 3. Firestore `user/{userId}/links` 실시간 동기화 구독 (createdAt 최신순 정렬)
+ * user/{userId}/links 또는 users/{userId}/links 둘 중 데이터가 있는 컬렉션을 자동 반영
  */
 export function subscribeFirestoreLinks(
+  userId: string,
   onData: (links: Block[]) => void,
   onError?: (error: Error) => void
 ) {
-  const linksRef = collection(db, "users", "anonymous", "links");
-  const q = query(linksRef, orderBy("createdAt", "desc"));
+  const safeUid = userId || "anonymous";
+  const userLinksRef = collection(db, "user", safeUid, "links");
+  const usersLinksRef = collection(db, "users", safeUid, "links");
 
-  return onSnapshot(
-    q,
+  const qUser = query(userLinksRef, orderBy("createdAt", "desc"));
+  const qUsers = query(usersLinksRef, orderBy("createdAt", "desc"));
+
+  let hasUserLinksData = false;
+
+  // 1) user/{userId}/links 리스너
+  const unsubUser = onSnapshot(
+    qUser,
     (snapshot) => {
-      const items: Block[] = snapshot.docs.map((d) => {
-        const data = d.data() as Partial<FirestoreLinkDocument>;
-        return {
-          id: d.id,
-          userId: data.userId || "anonymous",
-          type: "link",
-          title: data.title || "",
-          url: data.url || "",
-          icon: data.icon || "globe",
-          isActive: data.isActive !== undefined ? data.isActive : true,
-          order: typeof data.order === "number" ? data.order : 0,
-          clickCount: typeof data.clickCount === "number" ? data.clickCount : 0,
-          createdAt: data.createdAt,
-        };
-      });
-
-      const sorted = sortLinksByCreatedAtDesc(items);
-      onData(sorted);
+      if (!snapshot.empty) {
+        hasUserLinksData = true;
+        const items = snapshot.docs.map((d) => mapDocToBlock(d, safeUid));
+        onData(sortLinksByCreatedAtDesc(items));
+      } else if (!hasUserLinksData) {
+        // user/{userId}/links가 비어있으면 users/{userId}/links 데이터가 처리되도록 대기
+      } else {
+        // 원래 데이터가 있었는데 전부 삭제된 경우
+        onData([]);
+      }
     },
     (err) => {
-      console.error("Firestore 실시간 동기화 에러(orderBy):", err);
-      // orderBy 쿼리 에러 발생 시 컬렉션 전체 조회 폴백 리스너 연결
-      const fallbackUnsub = onSnapshot(
-        linksRef,
-        (fallbackSnapshot) => {
-          const items: Block[] = fallbackSnapshot.docs.map((d) => {
-            const data = d.data() as Partial<FirestoreLinkDocument>;
-            return {
-              id: d.id,
-              userId: data.userId || "anonymous",
-              type: "link",
-              title: data.title || "",
-              url: data.url || "",
-              icon: data.icon || "globe",
-              isActive: data.isActive !== undefined ? data.isActive : true,
-              order: typeof data.order === "number" ? data.order : 0,
-              clickCount: typeof data.clickCount === "number" ? data.clickCount : 0,
-              createdAt: data.createdAt,
-            };
-          });
-          onData(sortLinksByCreatedAtDesc(items));
-        },
-        (fallbackErr) => {
-          if (onError) onError(fallbackErr);
-        }
-      );
-      return fallbackUnsub;
+      console.warn("user/{userId}/links 리스너 알림:", err);
     }
   );
+
+  // 2) users/{userId}/links 리스너 (기존 데이터 호환)
+  const unsubUsers = onSnapshot(
+    qUsers,
+    (snapshot) => {
+      if (!hasUserLinksData) {
+        const items = snapshot.docs.map((d) => mapDocToBlock(d, safeUid));
+        onData(sortLinksByCreatedAtDesc(items));
+      }
+    },
+    (err) => {
+      if (onError && !hasUserLinksData) onError(err);
+    }
+  );
+
+  return () => {
+    unsubUser();
+    unsubUsers();
+  };
 }
 
 /**
- * 4. 링크 클릭 수 증가
+ * 4. 링크 클릭 수 증가 (user/{userId}/links/{linkId} 및 users/{userId}/links/{linkId})
  */
-export async function incrementFirestoreLinkClick(linkId: string, currentCount: number) {
+export async function incrementFirestoreLinkClick(
+  userId: string,
+  linkId: string,
+  currentCount: number
+) {
+  const safeUid = userId || "anonymous";
+  const newCount = currentCount + 1;
+
   try {
-    const linkDocRef = doc(db, "users", "anonymous", "links", linkId);
-    await updateDoc(linkDocRef, {
-      clickCount: currentCount + 1,
-    });
-  } catch (error) {
-    console.warn("Firestore 클릭 수 업데이트 실패:", error);
+    const userDocRef = doc(db, "user", safeUid, "links", linkId);
+    await updateDoc(userDocRef, { clickCount: newCount });
+  } catch {
+    // user에 없으면 users 경로 시도
+    try {
+      const usersDocRef = doc(db, "users", safeUid, "links", linkId);
+      await updateDoc(usersDocRef, { clickCount: newCount });
+    } catch (e) {
+      console.warn("Firestore 클릭 수 업데이트 실패:", e);
+    }
   }
 }
 
@@ -241,13 +276,19 @@ export interface UpdateLinkInput {
 }
 
 /**
- * 5. Firestore `users/anonymous/links` 경로의 링크 정보 수정 (인라인 편집)
+ * 5. Firestore `user/{userId}/links` (및 users/{userId}/links) 경로의 링크 정보 수정
  */
 export async function updateLinkInFirestore(
+  userId: string,
   linkId: string,
   input: UpdateLinkInput
 ): Promise<void> {
-  const linkDocRef = doc(db, "users", "anonymous", "links", linkId);
+  // [보안 검증] 로그인한 본인만 링크 수정 가능
+  if (!auth.currentUser || auth.currentUser.uid !== userId) {
+    throw new Error("링크 수정 권한이 없습니다. 본인 계정으로 로그인해주세요.");
+  }
+
+  const safeUid = userId || "anonymous";
   const updateData: { title: string; url: string; icon?: string } = {
     title: input.title.trim(),
     url: input.url.trim(),
@@ -255,13 +296,47 @@ export async function updateLinkInFirestore(
   if (input.icon) {
     updateData.icon = input.icon;
   }
-  await updateDoc(linkDocRef, updateData);
+
+  try {
+    const userDocRef = doc(db, "user", safeUid, "links", linkId);
+    await updateDoc(userDocRef, updateData);
+  } catch {
+    // user 컬렉션에 없을 경우
+  }
+
+  try {
+    const usersDocRef = doc(db, "users", safeUid, "links", linkId);
+    await updateDoc(usersDocRef, updateData);
+  } catch {
+    // users 컬렉션에 없을 경우
+  }
 }
 
 /**
- * 6. Firestore `users/anonymous/links` 경로의 링크 문서 삭제
+ * 6. Firestore `user/{userId}/links` (및 users/{userId}/links) 경로의 링크 문서 삭제
  */
-export async function deleteLinkFromFirestore(linkId: string): Promise<void> {
-  const linkDocRef = doc(db, "users", "anonymous", "links", linkId);
-  await deleteDoc(linkDocRef);
+export async function deleteLinkFromFirestore(
+  userId: string,
+  linkId: string
+): Promise<void> {
+  // [보안 검증] 로그인한 본인만 링크 삭제 가능
+  if (!auth.currentUser || auth.currentUser.uid !== userId) {
+    throw new Error("링크 삭제 권한이 없습니다. 본인 계정으로 로그인해주세요.");
+  }
+
+  const safeUid = userId || "anonymous";
+
+  try {
+    const userDocRef = doc(db, "user", safeUid, "links", linkId);
+    await deleteDoc(userDocRef);
+  } catch {
+    // user에 문서 없음
+  }
+
+  try {
+    const usersDocRef = doc(db, "users", safeUid, "links", linkId);
+    await deleteDoc(usersDocRef);
+  } catch {
+    // users에 문서 없음
+  }
 }

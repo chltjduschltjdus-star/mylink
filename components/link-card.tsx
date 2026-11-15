@@ -27,6 +27,7 @@ interface LinkCardProps {
   onClick?: (block: Block) => void;
   onUpdate?: (linkId: string, data: UpdateLinkInput) => Promise<void> | void;
   onDeleteRequest?: (block: Block) => void;
+  canEdit?: boolean;
   className?: string;
 }
 
@@ -35,6 +36,7 @@ export function LinkCard({
   onClick,
   onUpdate,
   onDeleteRequest,
+  canEdit = true,
   className = "",
 }: LinkCardProps) {
   const [isEditing, setIsEditing] = React.useState(false);
@@ -128,8 +130,8 @@ export function LinkCard({
   // URL에서 도메인 및 경로 추출 (https:// 제거)
   const displayUrl = block.url ? block.url.replace(/^https?:\/\//, "") : "";
 
-  // 1. 인라인 편집 모드 UI
-  if (isEditing) {
+  // 1. 인라인 편집 모드 UI (수정 권한이 있을 때만 가능)
+  if (canEdit && isEditing) {
     return (
       <Card
         onClick={(e) => e.stopPropagation()}
@@ -322,33 +324,38 @@ export function LinkCard({
             </Badge>
           )}
 
-          {/* 수정 버튼: 항상 표시 (Always visible) */}
-          <button
-            type="button"
-            title="링크 수정"
-            aria-label="링크 수정"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            className="size-7 rounded-lg flex items-center justify-center text-slate-500 bg-slate-100/90 hover:bg-pink-100 hover:text-pink-600 transition-colors cursor-pointer border border-slate-200/60 active:scale-95"
-          >
-            <Pencil className="size-3.5" />
-          </button>
+          {/* 본인 권한일 때만 수정/삭제 버튼 노출 */}
+          {canEdit && (
+            <>
+              {/* 수정 버튼 */}
+              <button
+                type="button"
+                title="링크 수정"
+                aria-label="링크 수정"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                }}
+                className="size-7 rounded-lg flex items-center justify-center text-slate-500 bg-slate-100/90 hover:bg-pink-100 hover:text-pink-600 transition-colors cursor-pointer border border-slate-200/60 active:scale-95"
+              >
+                <Pencil className="size-3.5" />
+              </button>
 
-          {/* 삭제 버튼: 항상 표시 (Always visible) */}
-          <button
-            type="button"
-            title="링크 삭제"
-            aria-label="링크 삭제"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteRequest?.(block);
-            }}
-            className="size-7 rounded-lg flex items-center justify-center text-slate-500 bg-slate-100/90 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer border border-slate-200/60 active:scale-95"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+              {/* 삭제 버튼 */}
+              <button
+                type="button"
+                title="링크 삭제"
+                aria-label="링크 삭제"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteRequest?.(block);
+                }}
+                className="size-7 rounded-lg flex items-center justify-center text-slate-500 bg-slate-100/90 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer border border-slate-200/60 active:scale-95"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </>
+          )}
 
           {/* 외부링크 화살표 */}
           <div className="size-7 rounded-full flex items-center justify-center text-slate-400 group-hover:text-pink-600 group-hover:translate-x-0.5 transition-all">

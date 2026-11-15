@@ -31,12 +31,13 @@ export function DeleteLinkDialog({
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (open) {
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
       setDeleteError(null);
       setIsDeleting(false);
     }
-  }, [open]);
+    onOpenChange(newOpen);
+  };
 
   const handleDelete = async () => {
     if (!link?.id) return;
@@ -45,7 +46,7 @@ export function DeleteLinkDialog({
       setIsDeleting(true);
       setDeleteError(null);
       await onDelete(link.id);
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch (err: unknown) {
       console.error("Firestore 링크 삭제 에러:", err);
       const message =
@@ -57,7 +58,7 @@ export function DeleteLinkDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !isDeleting && onOpenChange(v)}>
+    <Dialog open={open} onOpenChange={(v) => !isDeleting && handleOpenChange(v)}>
       <DialogContent className="max-w-[400px] rounded-2xl p-6 bg-white/95 backdrop-blur-md border border-rose-100 shadow-xl">
         <DialogHeader className="gap-1.5 text-left">
           <div className="flex items-center gap-2">

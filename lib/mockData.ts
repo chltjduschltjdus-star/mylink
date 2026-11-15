@@ -74,7 +74,7 @@ export const MOCK_USER: User = {
   username: "seoyeon_dev",
   displayName: "최서연 (Seoyeon Choi)",
   bio: "사용자 중심의 가치를 코드로 설계하는 프론트엔드 엔지니어 🌱 | 기술 블로그 & 오픈소스",
-  avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+  avatarUrl: "",
   themeId: "pastel-peach",
   customTheme: {
     backgroundColor: "#fdf8f5",
