@@ -4,7 +4,12 @@ import { getLinksFromFirestore } from '@/lib/links';
 import { MOCK_USER, MOCK_BLOCKS } from '@/lib/mockData';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-static';
+export function generateStaticParams() {
+  return [
+    { username: "최서연" },
+  ];
+}
+
 
 
 // 이미지 메타데이터
