@@ -59,6 +59,21 @@ export function YoutubeIcon({ className = "size-5", ...props }: React.ComponentP
   );
 }
 
+export const AVAILABLE_ICONS = [
+  { id: "globe", label: "웹사이트" },
+  { id: "github", label: "GitHub" },
+  { id: "instagram", label: "Instagram" },
+  { id: "youtube", label: "YouTube" },
+  { id: "mail", label: "이메일" },
+  { id: "coffee", label: "후원" },
+  { id: "message-circle", label: "채팅" },
+  { id: "laptop", label: "데모" },
+  { id: "package", label: "프로젝트" },
+  { id: "book-open", label: "블로그" },
+  { id: "pen-tool", label: "디자인" },
+  { id: "link2", label: "기본" },
+];
+
 export function getBlockIcon(iconName?: string, className = "size-5") {
   switch (iconName?.toLowerCase()) {
     case "github":

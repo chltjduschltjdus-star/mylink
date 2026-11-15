@@ -5,6 +5,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -231,4 +232,36 @@ export async function incrementFirestoreLinkClick(linkId: string, currentCount: 
   } catch (error) {
     console.warn("Firestore 클릭 수 업데이트 실패:", error);
   }
+}
+
+export interface UpdateLinkInput {
+  title: string;
+  url: string;
+  icon?: string;
+}
+
+/**
+ * 5. Firestore `users/anonymous/links` 경로의 링크 정보 수정 (인라인 편집)
+ */
+export async function updateLinkInFirestore(
+  linkId: string,
+  input: UpdateLinkInput
+): Promise<void> {
+  const linkDocRef = doc(db, "users", "anonymous", "links", linkId);
+  const updateData: { title: string; url: string; icon?: string } = {
+    title: input.title.trim(),
+    url: input.url.trim(),
+  };
+  if (input.icon) {
+    updateData.icon = input.icon;
+  }
+  await updateDoc(linkDocRef, updateData);
+}
+
+/**
+ * 6. Firestore `users/anonymous/links` 경로의 링크 문서 삭제
+ */
+export async function deleteLinkFromFirestore(linkId: string): Promise<void> {
+  const linkDocRef = doc(db, "users", "anonymous", "links", linkId);
+  await deleteDoc(linkDocRef);
 }

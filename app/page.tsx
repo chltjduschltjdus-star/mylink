@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/section-header";
 import { PageHeader } from "@/components/page-header";
 import { PageFooter } from "@/components/page-footer";
 import { AddLinkDialog, type NewLinkData } from "@/components/add-link-dialog";
+import { DeleteLinkDialog } from "@/components/delete-link-dialog";
 import { Plus, Sparkles } from "lucide-react";
 import {
   MOCK_USER,
@@ -20,7 +21,10 @@ import {
   getLinksFromFirestore,
   subscribeFirestoreLinks,
   incrementFirestoreLinkClick,
+  updateLinkInFirestore,
+  deleteLinkFromFirestore,
   sortLinksByCreatedAtDesc,
+  type UpdateLinkInput,
 } from "@/lib/links";
 
 export default function HomePage() {
@@ -30,6 +34,7 @@ export default function HomePage() {
   const [isCopied, setIsCopied] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [deletingBlock, setDeletingBlock] = useState<Block | null>(null);
 
   // 1. 페이지 로드시 Firestore `users/anonymous/links` 실시간 구독 (createdAt 최신순)
   useEffect(() => {
@@ -72,7 +77,32 @@ export default function HomePage() {
     });
   };
 
-  // 3. 링크 클릭 핸들러 (실시간 누적 클릭 카운트 & 새 창 URL 이동)
+  // 3. 링크 인라인 수정 핸들러: Firestore `users/anonymous/links` 문서 업데이트 및 상태 동기화
+  const handleUpdateLink = async (linkId: string, data: UpdateLinkInput) => {
+    await updateLinkInFirestore(linkId, data);
+
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id === linkId
+          ? {
+              ...b,
+              title: data.title,
+              url: data.url,
+              ...(data.icon ? { icon: data.icon } : {}),
+            }
+          : b
+      )
+    );
+  };
+
+  // 4. 링크 삭제 핸들러: Firestore `users/anonymous/links` 문서 삭제 및 상태 동기화
+  const handleDeleteLink = async (linkId: string) => {
+    await deleteLinkFromFirestore(linkId);
+
+    setBlocks((prev) => prev.filter((b) => b.id !== linkId));
+  };
+
+  // 5. 링크 클릭 핸들러 (실시간 누적 클릭 카운트 & 새 창 URL 이동)
   const handleLinkClick = (block: Block) => {
     if (!block.url) return;
 
@@ -197,6 +227,8 @@ export default function HomePage() {
                   key={block.id}
                   block={block}
                   onClick={handleLinkClick}
+                  onUpdate={handleUpdateLink}
+                  onDeleteRequest={(targetBlock) => setDeletingBlock(targetBlock)}
                 />
               );
             })
@@ -224,6 +256,16 @@ export default function HomePage() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onAddLink={handleAddLink}
+      />
+
+      {/* 6. 링크 삭제 확인 모달 */}
+      <DeleteLinkDialog
+        open={Boolean(deletingBlock)}
+        onOpenChange={(open) => {
+          if (!open) setDeletingBlock(null);
+        }}
+        link={deletingBlock}
+        onDelete={handleDeleteLink}
       />
     </div>
   );
