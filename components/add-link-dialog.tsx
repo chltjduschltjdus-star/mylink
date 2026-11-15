@@ -64,7 +64,7 @@ export interface NewLinkData {
 interface AddLinkDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddLink: (data: NewLinkData) => void;
+  onAddLink: (data: NewLinkData) => void | Promise<void>;
 }
 
 const AVAILABLE_ICONS = [
@@ -87,6 +87,9 @@ export function AddLinkDialog({
   onOpenChange,
   onAddLink,
 }: AddLinkDialogProps) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+
   // React Hook Form + Zod Resolver 연동
   const {
     register,
@@ -110,7 +113,7 @@ export function AddLinkDialog({
   const watchedUrl = watch("url");
   const watchedIcon = watch("icon") || "globe";
 
-  // 다이얼로그 열릴 때 폼 초기화
+  // 다이얼로그 열릴 때 폼 및 에러 초기화
   React.useEffect(() => {
     if (open) {
       reset({
@@ -118,28 +121,42 @@ export function AddLinkDialog({
         url: "",
         icon: "globe",
       });
+      setSubmitError(null);
+      setIsSubmitting(false);
     }
   }, [open, reset]);
 
-  // 폼 제출 핸들러 (유효성 검증 완료 시 호출)
-  const onSubmit = (data: AddLinkFormData) => {
+  // 폼 제출 핸들러 (Firestore 저장 비동기 연동)
+  const onSubmit = async (data: AddLinkFormData) => {
     let formattedUrl = data.url.trim();
     if (!/^https?:\/\//i.test(formattedUrl)) {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    onAddLink({
-      title: data.title.trim(),
-      url: formattedUrl,
-      icon: data.icon,
-    });
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
 
-    reset();
-    onOpenChange(false);
+      await onAddLink({
+        title: data.title.trim(),
+        url: formattedUrl,
+        icon: data.icon,
+      });
+
+      reset();
+      onOpenChange(false);
+    } catch (err: unknown) {
+      console.error("Firestore 링크 추가 에러:", err);
+      const message =
+        err instanceof Error ? err.message : "링크 저장에 실패했습니다. 다시 시도해주세요.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => !isSubmitting && onOpenChange(v)}>
       <DialogContent className="max-w-[420px] rounded-2xl p-6 bg-white/95 backdrop-blur-md border border-pink-100 shadow-xl">
         <DialogHeader className="gap-1.5 text-left">
           <div className="flex items-center gap-2">
@@ -155,6 +172,13 @@ export function AddLinkDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {submitError && (
+          <div className="mt-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-xs flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>{submitError}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-2">
           {/* 1. 링크 제목 입력 */}
           <div className="flex flex-col gap-1.5">
@@ -164,6 +188,7 @@ export function AddLinkDialog({
             <Input
               id="link-title"
               placeholder="예: 최신 프로젝트 포트폴리오"
+              disabled={isSubmitting}
               {...register("title")}
               aria-invalid={!!errors.title}
               className={`h-10 text-sm bg-slate-50/70 rounded-xl transition-all ${
@@ -189,6 +214,7 @@ export function AddLinkDialog({
             <Input
               id="link-url"
               placeholder="https://example.com 또는 github.com"
+              disabled={isSubmitting}
               {...register("url")}
               aria-invalid={!!errors.url}
               className={`h-10 text-sm bg-slate-50/70 rounded-xl transition-all ${
@@ -221,13 +247,14 @@ export function AddLinkDialog({
                   <button
                     key={item.id}
                     type="button"
+                    disabled={isSubmitting}
                     title={item.label}
                     onClick={() => setValue("icon", item.id, { shouldValidate: true })}
                     className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${
                       isSelected
                         ? "bg-pink-100 text-pink-600 ring-2 ring-pink-400 ring-offset-1 font-bold shadow-xs scale-105"
                         : "text-slate-500 hover:bg-white hover:text-slate-800"
-                    }`}
+                    } ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <div className="size-4 flex items-center justify-center">
                       {getBlockIcon(item.id, "size-4")}
@@ -274,6 +301,7 @@ export function AddLinkDialog({
                   type="button"
                   variant="ghost"
                   size="sm"
+                  disabled={isSubmitting}
                   className="rounded-xl text-slate-500 hover:bg-slate-100"
                 >
                   취소
@@ -283,11 +311,20 @@ export function AddLinkDialog({
             <Button
               type="submit"
               size="sm"
-              disabled={!isValid && isDirty}
+              disabled={(!isValid && isDirty) || isSubmitting}
               className="bg-gradient-to-r from-pink-500 to-rose-400 hover:from-pink-600 hover:to-rose-500 text-white rounded-xl px-4 font-semibold shadow-xs disabled:opacity-40 transition-all active:scale-95"
             >
-              <Plus className="size-3.5 mr-1" />
-              링크 추가
+              {isSubmitting ? (
+                <>
+                  <div className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1.5" />
+                  <span>저장 중...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="size-3.5 mr-1" />
+                  <span>링크 추가</span>
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

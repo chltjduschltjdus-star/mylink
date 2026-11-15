@@ -23,6 +23,16 @@ export interface User {
   createdAt: string;
 }
 
+export type TimestampLike =
+  | { toMillis?: () => number; toDate?: () => Date; seconds?: number; nanoseconds?: number }
+  | Date
+  | string
+  | number
+  | null
+  | undefined
+  | Record<string, unknown>
+  | object;
+
 export interface Block {
   id: string;
   userId: string;
@@ -33,6 +43,7 @@ export interface Block {
   isActive: boolean;
   order: number;
   clickCount: number;
+  createdAt?: TimestampLike;
 }
 
 export interface PageAnalytics {
