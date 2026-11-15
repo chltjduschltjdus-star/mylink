@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +17,43 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getBlockIcon } from "@/components/icons";
-import { Plus, Sparkles, Link2 } from "lucide-react";
+import { Plus, Sparkles, Link2, AlertCircle } from "lucide-react";
+
+// Zod 유효성 검증 스키마 정의
+export const addLinkSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, { message: "링크 제목을 1자 이상 입력해주세요." })
+    .max(40, { message: "링크 제목은 40자 이내로 입력해주세요." }),
+  url: z
+    .string()
+    .trim()
+    .min(1, { message: "연결할 웹사이트 주소(URL)를 입력해주세요." })
+    .refine(
+      (val) => {
+        // 프로토콜이 없으면 https:// 붙여서 유효한 URL인지 확인
+        const formatted = /^https?:\/\//i.test(val) ? val : `https://${val}`;
+        try {
+          const parsed = new URL(formatted);
+          return (
+            (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+            parsed.hostname.length > 2 &&
+            parsed.hostname.includes(".")
+          );
+        } catch {
+          return false;
+        }
+      },
+      {
+        message:
+          "올바른 웹사이트 주소 형식(URL)을 입력해주세요. (예: https://example.com 또는 github.com)",
+      }
+    ),
+  icon: z.string(),
+});
+
+export type AddLinkFormData = z.infer<typeof addLinkSchema>;
 
 export interface NewLinkData {
   title: string;
@@ -49,52 +87,56 @@ export function AddLinkDialog({
   onOpenChange,
   onAddLink,
 }: AddLinkDialogProps) {
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [icon, setIcon] = useState("globe");
-  const [error, setError] = useState<string | null>(null);
+  // React Hook Form + Zod Resolver 연동
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isValid, isDirty },
+  } = useForm<AddLinkFormData>({
+    resolver: zodResolver(addLinkSchema),
+    mode: "onChange",
+    defaultValues: {
+      title: "",
+      url: "",
+      icon: "globe",
+    },
+  });
 
-  // 다이얼로그가 열리거나 닫힐 때 초기화
+  // 실시간 입력값 모니터링 (실시간 미리보기 연동)
+  const watchedTitle = watch("title");
+  const watchedUrl = watch("url");
+  const watchedIcon = watch("icon") || "globe";
+
+  // 다이얼로그 열릴 때 폼 초기화
   React.useEffect(() => {
     if (open) {
-      setTitle("");
-      setUrl("");
-      setIcon("globe");
-      setError(null);
+      reset({
+        title: "",
+        url: "",
+        icon: "globe",
+      });
     }
-  }, [open]);
+  }, [open, reset]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const trimmedTitle = title.trim();
-    let trimmedUrl = url.trim();
-
-    if (!trimmedTitle) {
-      setError("링크 제목을 입력해주세요.");
-      return;
-    }
-
-    if (!trimmedUrl) {
-      setError("연결할 웹 주소(URL)를 입력해주세요.");
-      return;
-    }
-
-    // http 또는 https 프로토콜이 누락된 경우 https:// 자동 보정
-    if (!/^https?:\/\//i.test(trimmedUrl)) {
-      trimmedUrl = `https://${trimmedUrl}`;
+  // 폼 제출 핸들러 (유효성 검증 완료 시 호출)
+  const onSubmit = (data: AddLinkFormData) => {
+    let formattedUrl = data.url.trim();
+    if (!/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = `https://${formattedUrl}`;
     }
 
     onAddLink({
-      title: trimmedTitle,
-      url: trimmedUrl,
-      icon,
+      title: data.title.trim(),
+      url: formattedUrl,
+      icon: data.icon,
     });
 
+    reset();
     onOpenChange(false);
   };
-
-  const isFormValid = title.trim().length > 0 && url.trim().length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,8 +155,8 @@ export function AddLinkDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
-          {/* 링크 제목 입력 */}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-2">
+          {/* 1. 링크 제목 입력 */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="link-title" className="text-xs font-semibold text-slate-700">
               링크 제목 <span className="text-pink-500">*</span>
@@ -122,50 +164,65 @@ export function AddLinkDialog({
             <Input
               id="link-title"
               placeholder="예: 최신 프로젝트 포트폴리오"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (error) setError(null);
-              }}
-              className="h-10 text-sm bg-slate-50/70 border-slate-200 focus-visible:border-pink-400 focus-visible:ring-pink-200/50 rounded-xl"
+              {...register("title")}
+              aria-invalid={!!errors.title}
+              className={`h-10 text-sm bg-slate-50/70 rounded-xl transition-all ${
+                errors.title
+                  ? "border-rose-400 focus-visible:ring-rose-200"
+                  : "border-slate-200 focus-visible:border-pink-400 focus-visible:ring-pink-200/50"
+              }`}
               autoFocus
             />
+            {errors.title && (
+              <p className="flex items-center gap-1 text-[11px] text-rose-500 font-medium">
+                <AlertCircle className="size-3 shrink-0" />
+                <span>{errors.title.message}</span>
+              </p>
+            )}
           </div>
 
-          {/* 링크 URL 입력 */}
+          {/* 2. 링크 URL 입력 */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="link-url" className="text-xs font-semibold text-slate-700">
               웹사이트 주소 (URL) <span className="text-pink-500">*</span>
             </Label>
             <Input
               id="link-url"
-              placeholder="https://example.com"
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                if (error) setError(null);
-              }}
-              className="h-10 text-sm bg-slate-50/70 border-slate-200 focus-visible:border-pink-400 focus-visible:ring-pink-200/50 rounded-xl"
+              placeholder="https://example.com 또는 github.com"
+              {...register("url")}
+              aria-invalid={!!errors.url}
+              className={`h-10 text-sm bg-slate-50/70 rounded-xl transition-all ${
+                errors.url
+                  ? "border-rose-400 focus-visible:ring-rose-200"
+                  : "border-slate-200 focus-visible:border-pink-400 focus-visible:ring-pink-200/50"
+              }`}
             />
-            <p className="text-[11px] text-slate-400">
-              * https:// 없이 입력해도 자동으로 연결됩니다.
-            </p>
+            {errors.url ? (
+              <p className="flex items-center gap-1 text-[11px] text-rose-500 font-medium">
+                <AlertCircle className="size-3 shrink-0" />
+                <span>{errors.url.message}</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400">
+                * https:// 없이 입력해도 자동으로 연결됩니다.
+              </p>
+            )}
           </div>
 
-          {/* 아이콘 선택 */}
+          {/* 3. 아이콘 선택 */}
           <div className="flex flex-col gap-2">
             <Label className="text-xs font-semibold text-slate-700">
               아이콘 선택
             </Label>
             <div className="grid grid-cols-6 gap-1.5 max-h-[120px] overflow-y-auto p-1 bg-slate-50/50 rounded-xl border border-slate-100">
               {AVAILABLE_ICONS.map((item) => {
-                const isSelected = icon === item.id;
+                const isSelected = watchedIcon === item.id;
                 return (
                   <button
                     key={item.id}
                     type="button"
                     title={item.label}
-                    onClick={() => setIcon(item.id)}
+                    onClick={() => setValue("icon", item.id, { shouldValidate: true })}
                     className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${
                       isSelected
                         ? "bg-pink-100 text-pink-600 ring-2 ring-pink-400 ring-offset-1 font-bold shadow-xs scale-105"
@@ -184,7 +241,7 @@ export function AddLinkDialog({
             </div>
           </div>
 
-          {/* 실시간 미리보기 (Live Preview) */}
+          {/* 4. 실시간 미리보기 (Live Preview) */}
           <div className="flex flex-col gap-1.5 pt-1">
             <span className="text-[11px] font-medium text-slate-400">
               미리보기
@@ -192,14 +249,14 @@ export function AddLinkDialog({
             <div className="rounded-xl border border-pink-200/70 bg-gradient-to-r from-pink-50/50 to-orange-50/30 p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-pink-100 text-pink-600">
-                  {getBlockIcon(icon, "size-4")}
+                  {getBlockIcon(watchedIcon, "size-4")}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-semibold text-slate-800 truncate">
-                    {title || "링크 제목을 입력하세요"}
+                    {watchedTitle || "링크 제목을 입력하세요"}
                   </span>
                   <span className="text-[10px] text-slate-400 truncate">
-                    {url || "https://example.com"}
+                    {watchedUrl || "https://example.com"}
                   </span>
                 </div>
               </div>
@@ -209,12 +266,7 @@ export function AddLinkDialog({
             </div>
           </div>
 
-          {/* 에러 메시지 */}
-          {error && (
-            <p className="text-xs text-rose-500 font-medium">{error}</p>
-          )}
-
-          {/* 다이얼로그 푸터 버튼 */}
+          {/* 5. 다이얼로그 푸터 버튼 */}
           <DialogFooter className="mt-2 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
             <DialogClose
               render={
@@ -231,7 +283,7 @@ export function AddLinkDialog({
             <Button
               type="submit"
               size="sm"
-              disabled={!isFormValid}
+              disabled={!isValid && isDirty}
               className="bg-gradient-to-r from-pink-500 to-rose-400 hover:from-pink-600 hover:to-rose-500 text-white rounded-xl px-4 font-semibold shadow-xs disabled:opacity-40 transition-all active:scale-95"
             >
               <Plus className="size-3.5 mr-1" />
