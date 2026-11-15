@@ -4,9 +4,12 @@ import { getLinksFromFirestore } from '@/lib/links';
 import { MOCK_USER, MOCK_BLOCKS } from '@/lib/mockData';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-static';
 export function generateStaticParams() {
   return [
     { username: "최서연" },
+    { username: "%EC%B5%9C%EC%84%9C%EC%97%B0" },
+    { username: "user" },
   ];
 }
 

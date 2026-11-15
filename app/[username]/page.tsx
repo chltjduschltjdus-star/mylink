@@ -13,6 +13,8 @@ export default async function DynamicProfilePage({ params }: PageProps) {
 
 export function generateStaticParams() {
   return [
-   { username: "최서연" },
+    { username: "최서연" },
+    { username: "%EC%B5%9C%EC%84%9C%EC%97%B0" },
+    { username: "user" },
   ];
 }

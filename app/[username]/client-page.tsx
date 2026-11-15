@@ -117,7 +117,7 @@ export function DisplayNameClientPage({ initialDisplayName }: DisplayNameClientP
       // 본인이 로그인된 상태에서 로그아웃된 경우, 프로필을 보기 전용으로 남기지 않고 즉시 홈(Google 로그인 화면)으로 이동
       if (prevUserRef.current && !fbUser) {
         if (typeof window !== "undefined") {
-          window.location.href = "/";
+          window.location.href = "/mylink/";
           return;
         }
       }
@@ -210,7 +210,7 @@ export function DisplayNameClientPage({ initialDisplayName }: DisplayNameClientP
       console.error("로그아웃 에러:", error);
     } finally {
       if (typeof window !== "undefined") {
-        window.location.href = "/";
+        window.location.href = "/mylink/";
       }
     }
   };
@@ -411,7 +411,7 @@ export function DisplayNameClientPage({ initialDisplayName }: DisplayNameClientP
                   variant="outline"
                   onClick={() => {
                     const myName = currentUser.displayName || (currentUser.email ? currentUser.email.split("@")[0] : currentUser.uid);
-                    window.location.href = `/${encodeURIComponent(myName)}`;
+                    window.location.href = `/mylink/${encodeURIComponent(myName)}`;
                   }}
                   className="h-6 text-[11px] border-amber-300 bg-white hover:bg-amber-100 text-amber-800 cursor-pointer"
                 >
